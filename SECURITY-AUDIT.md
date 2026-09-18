@@ -1,15 +1,15 @@
 # 🔍 安全审计报告
 
 > **发布说明**
-> - 主副本：`E:\Workspace\AI\Skills\arthas-remote-profile\`（可推送到 git 的源）
-> - 运行位：`~/.workbuddy/skills/arthas-remote-profile\`
-> - **AI 不代为上传**；是否推送由本人手动决定。
+> - 主副本：本仓库（可推送到 git 的源）
+> - 运行位：宿主技能根下的同名目录（把本仓库整个目录拷进去即可）
+> - 是否推送由维护者手动决定。
 > - 本技能**只含通用方法论**，不含任何实战案例、内网环境信息与业务标识。
->   全目录无凭据值、无真实主机名/IP、无部署路径、无专有类名。`grep` 复核通过。
+>   全目录无凭据值、无真实主机名/IP、无本地部署路径、无专有类名。
 
 ## 📊 执行摘要
 
-- **审计对象**: `arthas-remote-profile`（`E:\Workspace\AI\Skills\arthas-remote-profile\`）
+- **审计对象**: `arthas-remote-profile`
 - **审计时间**: 2026-09-17 18:20（18:35 更新：移除实战案例后的复核）
 - **审计方式**: 纯静态文本分析（仅使用只读工具：读取文件 / 关键词搜索）
 - **审计文件**: `SKILL.md`、`scripts/arthas_profiler.py`、`references/arthas-commands.md`
