@@ -129,6 +129,7 @@ python scripts/arthas_profiler.py path ./wall_collapsed.txt SomeMapper.selectPag
 
 | 现象 | 原因 / 处理 |
 |---|---|
+| `attach` 或任何 `nohup ... &` 命令**不返回、会话像卡死** | 后台进程继承了 SSH 通道的 **stdin**，通道不关闭，`exec_command` 就一直阻塞。必须把 stdin 也重定向：`setsid nohup <cmd> < /dev/null > /tmp/x.log 2>&1 &`（只重定向 stdout/stderr 不够）。注意：此时程序**其实已经启动成功**，先查 `ps -ef` + 探 API，别急着重跑 |
 | 脚本读 Arthas 输出一直卡住 | 用的 telnet 3658，IAC 协商没谈通。改走 HTTP API 8563 |
 | `Affect(class count: 0)` | 增强已被重置（`-n` 用满或应用重启过）。先 `reset <类名>` 再 `trace` |
 | 命令报 `#: command not found` | 把带 `#` 的行一起粘进 arthas 了。arthas 控制台不接受注释行 |

@@ -187,14 +187,26 @@ def cmd_attach(client, cfg, pid, jar):
         print("未指定 --pid，候选进程：\n" + out)
         return
     print("附着 arthas 到 PID %s（%s）..." % (pid, jar))
-    run(client, "cd /tmp && nohup java -jar %s %s > /tmp/arthas-boot.log 2>&1 &"
-        % (jar, pid))
+    # ⚠️ 关键：nohup 后台启动时**必须把 stdin 也重定向**（< /dev/null）。
+    # 否则后台 java 进程会继承 SSH 通道的 stdin，通道不关闭，exec_command 会一直阻塞
+    # ——表现为"父会话卡死"。stdout/stderr 已重定向但仍不够。
+    cmd = ("cd /tmp && setsid nohup java -jar %s %s < /dev/null "
+           "> /tmp/arthas-boot.log 2>&1 & echo STARTED" % (jar, pid))
+    try:
+        out, _ = run(client, cmd, timeout=15)
+        print(out.strip())
+    except Exception as exc:  # 通道超时不致命，后面靠轮询 API 判断
+        print("（启动通道未及时返回，继续轮询 API：%s）" % exc)
     for i in range(30):
         time.sleep(1)
-        if api_alive(client, cfg):
-            print("OK，HTTP API 已就绪（等待 %ds）" % (i + 1))
-            return
-    print("超时。日志：\n" + sh_ok(client, "tail -30 /tmp/arthas-boot.log"))
+        try:
+            if api_alive(client, cfg):
+                print("OK，arthas HTTP API 已就绪（等待 %ds）" % (i + 1))
+                return
+        except Exception:
+            pass
+    print("30s 内 API 未就绪。boot 日志：\n"
+          + sh_ok(client, "tail -30 /tmp/arthas-boot.log 2>/dev/null"))
 
 
 def cmd_prof(client, cfg, action, event, interval, fmt, remote_file):
