@@ -4,7 +4,7 @@
 
 ```bash
 # 附着到指定 PID（后台常驻，随后即可用 HTTP API / telnet）
-nohup java -jar /opt/arthas/arthas-boot.jar <PID> > /tmp/arthas-boot.log 2>&1 &
+nohup java -jar /opt/arthas/arthas-boot.jar <PID> > ${ARTHAS_REMOTE_TMP:-/tmp}/arthas-boot.log 2>&1 &
 
 # 只看有哪些 java 进程
 ps -eo pid,etime,args | grep '[j]ava'
@@ -67,17 +67,17 @@ Content-Type: application/json
 
 ```bash
 # 远端封装脚本（一次性生成）
-cat > /tmp/arthas_call.sh <<'EOS'
+cat > ${ARTHAS_REMOTE_TMP:-/tmp}/arthas_call.sh <<'EOS'
 #!/bin/sh
-printf '{"action":"exec","command":"%s"}' "$1" > /tmp/arthas_req.json
+printf '{"action":"exec","command":"%s"}' "$1" > ${ARTHAS_REMOTE_TMP:-/tmp}/arthas_req.json
 curl -s -m 600 -X POST http://127.0.0.1:8563/api \
-  -H 'Content-Type: application/json' --data @/tmp/arthas_req.json
+  -H 'Content-Type: application/json' --data @${ARTHAS_REMOTE_TMP:-/tmp}/arthas_req.json
 EOS
-chmod +x /tmp/arthas_call.sh
+chmod +x ${ARTHAS_REMOTE_TMP:-/tmp}/arthas_call.sh
 
 # 调用（命令经 base64 传递，零转义风险）
-echo '<base64>' | base64 -d > /tmp/cmd.txt
-sh /tmp/arthas_call.sh "$(cat /tmp/cmd.txt)"
+echo '<base64>' | base64 -d > ${ARTHAS_REMOTE_TMP:-/tmp}/cmd.txt
+sh ${ARTHAS_REMOTE_TMP:-/tmp}/arthas_call.sh "$(cat ${ARTHAS_REMOTE_TMP:-/tmp}/cmd.txt)"
 ```
 
 ## 三、命令速查
@@ -118,8 +118,8 @@ sh /tmp/arthas_call.sh "$(cat /tmp/cmd.txt)"
 | `profiler start -e wall -i 10ms` | 开墙钟采样，10ms 一点 |
 | `profiler start -e cpu` | 开 CPU 采样（看不到 IO 等待） |
 | `profiler status` | 采样跑了多久 |
-| `profiler stop --format collapsed --file /tmp/x.txt` | 输出折叠栈文本（**最好解析**） |
-| `profiler stop --format html --file /tmp/x.html` | 输出交互式火焰图（给人看） |
+| `profiler stop --format collapsed --file ${ARTHAS_REMOTE_TMP:-/tmp}/x.txt` | 输出折叠栈文本（**最好解析**） |
+| `profiler stop --format html --file ${ARTHAS_REMOTE_TMP:-/tmp}/x.html` | 输出交互式火焰图（给人看） |
 | `profiler stop --format flamegraph` | 输出 SVG 火焰图 |
 
 **collapsed 格式**：每行 `frame;frame;frame <采样点数>`，帧名是 `com/foo/Bar.method` 形式，

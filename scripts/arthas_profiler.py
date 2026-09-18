@@ -51,9 +51,13 @@ except ImportError:  # ssh 相关子命令需要
     paramiko = None
 
 DEFAULT_API = "http://127.0.0.1:8563/api"
-CALL_SH = "/tmp/arthas_call.sh"
-REMOTE_CMD = "/tmp/arthas_cmd.b64"
-PROFILER_OUT = "/tmp/arthas_profile.out"
+REMOTE_TMP = os.environ.get("ARTHAS_REMOTE_TMP", "/tmp")
+CALL_SH = REMOTE_TMP + "/arthas_call.sh"
+REMOTE_CMD = REMOTE_TMP + "/arthas_cmd.b64"
+REQ_JSON = REMOTE_TMP + "/arthas_req.json"
+SAMPLE_SH = REMOTE_TMP + "/_sample.sh"
+BOOT_LOG = REMOTE_TMP + "/arthas-boot.log"
+PROFILER_OUT = REMOTE_TMP + "/arthas_profile.out"
 
 
 # --------------------------------------------------------------------------- #
@@ -111,12 +115,12 @@ def sh_ok(client, cmd, timeout=60):
 # arthas 通道
 # --------------------------------------------------------------------------- #
 def bootstrap(client, cfg):
-    """在目标机写一个 /tmp/arthas_call.sh，把 arthas HTTP API 包成一条命令。"""
+    """在目标机临时目录写一个调用脚本，把 arthas HTTP API 包成一条命令。"""
     script = (
         "#!/bin/sh\n"
-        "printf '{\"action\":\"exec\",\"command\":\"%s\"}' \"$1\" > /tmp/arthas_req.json\n"
+        "printf '{\"action\":\"exec\",\"command\":\"%s\"}' \"$1\" > " + REQ_JSON + "\n"
         "curl -s -m 600 -X POST " + cfg.api + " -H 'Content-Type: application/json' "
-        "--data @/tmp/arthas_req.json\n"
+        "--data @" + REQ_JSON + "\n"
     )
     b64 = base64.b64encode(script.encode()).decode()
     out, _ = run(client, "echo %s | base64 -d > %s; chmod +x %s; echo OK"
@@ -190,8 +194,8 @@ def cmd_attach(client, cfg, pid, jar):
     # ⚠️ 关键：nohup 后台启动时**必须把 stdin 也重定向**（< /dev/null）。
     # 否则后台 java 进程会继承 SSH 通道的 stdin，通道不关闭，exec_command 会一直阻塞
     # ——表现为"父会话卡死"。stdout/stderr 已重定向但仍不够。
-    cmd = ("cd /tmp && setsid nohup java -jar %s %s < /dev/null "
-           "> /tmp/arthas-boot.log 2>&1 & echo STARTED" % (jar, pid))
+    cmd = ("cd /tmp && setsid nohup java -jar %s %s < /dev/null > %s 2>&1 & echo STARTED"
+           % (jar, pid, BOOT_LOG))
     try:
         out, _ = run(client, cmd, timeout=15)
         print(out.strip())
@@ -206,7 +210,7 @@ def cmd_attach(client, cfg, pid, jar):
         except Exception:
             pass
     print("30s 内 API 未就绪。boot 日志：\n"
-          + sh_ok(client, "tail -30 /tmp/arthas-boot.log 2>/dev/null"))
+          + sh_ok(client, "tail -30 " + BOOT_LOG + " 2>/dev/null"))
 
 
 def cmd_prof(client, cfg, action, event, interval, fmt, remote_file):
@@ -243,8 +247,8 @@ def cmd_sample(client, cfg, trigger, event, remote_out, local_out, settle):
              settle=settle, out=remote_out)
 
     b64 = base64.b64encode(script.encode()).decode()
-    out, err = run(client, "echo %s | base64 -d > /tmp/_sample.sh; bash /tmp/_sample.sh"
-                   % b64, timeout=cfg.timeout)
+    out, err = run(client, "echo %s | base64 -d > %s; bash %s"
+                   % (b64, SAMPLE_SH, SAMPLE_SH), timeout=cfg.timeout)
     print(out)
     if err.strip():
         print("[stderr] " + err)

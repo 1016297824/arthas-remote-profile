@@ -1,6 +1,7 @@
 ---
 name: arthas-remote-profile
-description: 通过 SSH 登录远程主机或 Docker 容器，用 Arthas 对运行中的 JVM 做在线性能诊断——在「不重启、不改代码、不注入 agent」的前提下，用墙钟火焰图、trace、monitor 定位慢接口/慢任务的热点方法与真实调用次数，并把耗时拆解到具体代码行。当用户反馈某个接口或定时任务「很慢」「超时」「耗时异常」，需要在不重启服务的情况下找出耗时究竟花在哪个方法、哪条 SQL、哪个循环上时使用。适用于任何 SSH 可达、且能用 java -jar arthas-boot.jar 附着的 JVM 进程，尤其 Java 8 + Spring Boot + MyBatis 的传统单体。
+description: 当用户反馈接口、定时任务或某个功能「很慢」「超时」「耗时异常」「响应从 200ms 涨到几秒」「接口卡住」「偶尔卡一下」，或只说「性能差」「优化一下」却说不清慢在哪时使用本技能——在不重启、不改代码、不注入 agent 的前提下，用 Arthas 附着运行中的 JVM，以墙钟火焰图、trace、monitor 定位热点方法与真实调用次数，把耗时拆解到具体代码行、SQL 和循环。适用于 Java / JVM / Spring Boot / MyBatis 等 SSH 可达、能用 arthas-boot.jar 附着的在线服务，尤其传统 Java 单体。若问题在 JVM 之外（网络、网关、DNS、磁盘 IO、DB 自身慢查询），或属内存泄漏与 GC 排查，不适用本技能。
+version: "1.1.0"
 agent_created: true
 ---
 
@@ -129,7 +130,7 @@ python scripts/arthas_profiler.py path ./wall_collapsed.txt SomeMapper.selectPag
 
 | 现象 | 原因 / 处理 |
 |---|---|
-| `attach` 或任何 `nohup ... &` 命令**不返回、会话像卡死** | 后台进程继承了 SSH 通道的 **stdin**，通道不关闭，`exec_command` 就一直阻塞。必须把 stdin 也重定向：`setsid nohup <cmd> < /dev/null > /tmp/x.log 2>&1 &`（只重定向 stdout/stderr 不够）。注意：此时程序**其实已经启动成功**，先查 `ps -ef` + 探 API，别急着重跑 |
+| `attach` 或任何 `nohup ... &` 命令**不返回、会话像卡死** | 后台进程继承了 SSH 通道的 **stdin**，通道不关闭，`exec_command` 就一直阻塞。必须把 stdin 也重定向：`setsid nohup <cmd> < /dev/null > ${ARTHAS_REMOTE_TMP:-/tmp}/x.log 2>&1 &`（只重定向 stdout/stderr 不够）。注意：此时程序**其实已经启动成功**，先查 `ps -ef` + 探 API，别急着重跑 |
 | 脚本读 Arthas 输出一直卡住 | 用的 telnet 3658，IAC 协商没谈通。改走 HTTP API 8563 |
 | `Affect(class count: 0)` | 增强已被重置（`-n` 用满或应用重启过）。先 `reset <类名>` 再 `trace` |
 | 命令报 `#: command not found` | 把带 `#` 的行一起粘进 arthas 了。arthas 控制台不接受注释行 |
@@ -159,7 +160,7 @@ python scripts/arthas_profiler.py path ./wall_collapsed.txt SomeMapper.selectPag
 - **本流程只读。** 不要用 `sh` 子命令去执行写数据、改配置、重启进程的命令。
 - 凭据走环境变量或 `--env-file`，**不要硬编码进脚本、不要提交进仓库**。
 - 凭据文件用完**立即删除**；如果密码曾在对话、截图、日志里出现过，提醒用户更换。
-- 采样会产生少量磁盘文件（默认 `/tmp/`），诊断结束后可顺手清掉。
+- 采样会在目标机临时目录（默认 `/tmp`，可用 `ARTHAS_REMOTE_TMP` 改）产生少量磁盘文件，诊断结束后可顺手清掉。
 
 ## 脚本
 
@@ -169,4 +170,4 @@ python scripts/arthas_profiler.py path ./wall_collapsed.txt SomeMapper.selectPag
 | `references/arthas-commands.md` | arthas 命令速查、HTTP API 用法、报错对照表 |
 
 脚本配置可用参数或环境变量：`ARTHAS_SSH_HOST` / `ARTHAS_SSH_PORT` / `ARTHAS_SSH_USER` /
-`ARTHAS_SSH_PASSWORD` / `ARTHAS_API` / `ARTHAS_BOOT_JAR`。
+`ARTHAS_SSH_PASSWORD` / `ARTHAS_API` / `ARTHAS_BOOT_JAR` / `ARTHAS_REMOTE_TMP`。

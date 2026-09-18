@@ -33,7 +33,7 @@
 | 读取敏感信息 + 危险操作 | ❌ | 不读取 `~/.ssh`、`.env` 等；凭据仅从环境变量/`--env-file` 读取 |
 | 自动执行破坏性命令 | ❌ | 无 `rm -rf`、无系统配置修改 |
 | 隐蔽 + 危险操作 | ❌ | 无 `2>/dev/null` 掩藏危险操作 |
-| 权限提升 + 危险操作 | ❌ | 无 `sudo`；仅有对自建 `/tmp/arthas_call.sh` 的 `chmod +x` |
+| 权限提升 + 危险操作 | ❌ | 无 `sudo`；仅有对自建 `${ARTHAS_REMOTE_TMP:-/tmp}/arthas_call.sh` 的 `chmod +x` |
 
 ---
 
@@ -62,10 +62,10 @@
 - **位置**: `scripts/arthas_profiler.py` — `cmd_attach`
 - **代码片段**:
   ```python
-  run(client, "cd /tmp && nohup java -jar %s %s > /tmp/arthas-boot.log 2>&1 &" % (jar, pid))
+  run(client, "cd /tmp && nohup java -jar %s %s > ${ARTHAS_REMOTE_TMP:-/tmp}/arthas-boot.log 2>&1 &" % (jar, pid))
   ```
 - **风险描述**: 以 `nohup ... &` 方式后台常驻启动 arthas，会在目标机留下一个持续运行的 Java 进程，
-  并监听 3658/8563 端口，同时写入 `/tmp/arthas-boot.log`。
+  并监听 3658/8563 端口，同时写入 `${ARTHAS_REMOTE_TMP:-/tmp}/arthas-boot.log`。
 - **判定依据（Step B）**: 这不是危险操作 —— arthas 附着是官方标准用法，不修改业务进程、不写业务数据。
 - **修复建议**: 诊断结束后在 arthas 里执行 `stop` 退出；`SKILL.md` 已提示采样会在 `/tmp` 留下文件、可清理。
 
@@ -99,7 +99,7 @@
 - 详细列表:
   - `arthas_profiler.py`：`client.exec_command(...)` —— 通过 SSH 执行命令，技能核心功能
   - `arthas_profiler.py`：`nohup java -jar arthas-boot.jar` —— attach 功能
-  - `arthas_profiler.py`：`chmod +x /tmp/arthas_call.sh` —— 对自建临时文件授权
+  - `arthas_profiler.py`：`chmod +x ${ARTHAS_REMOTE_TMP:-/tmp}/arthas_call.sh` —— 对自建临时文件授权
   - `arthas_profiler.py`：无 `subprocess` / `os.system` / `eval` / `exec(` 调用
 - **未发现** `curl | bash`、`wget | sh`、`eval(...)`、动态代码加载。
 
@@ -107,7 +107,7 @@
 
 - 发现次数: 2 处
 - 详细列表:
-  - 写入 `/tmp/` 下临时文件（`arthas_call.sh`、`arthas_cmd.b64`、`arthas_req.json`）—— 合理
+  - 写入远端临时目录下的临时文件（`arthas_call.sh`、`arthas_cmd.b64`、`arthas_req.json`）—— 合理
   - `sftp.get()` 仅用于把采样结果**从目标机下载到本地**，方向单一
 - **未读取**：`~/.ssh`、`~/.aws`、`~/.kube`、`/etc/passwd`、凭证文件
 - **无删除操作**：脚本内不存在 `rm` / `unlink` / `shutil.rmtree`
